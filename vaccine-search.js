@@ -2,16 +2,9 @@ const fetch = require('node-fetch');
 const dotenv = require('dotenv');
 const express = require('express');
 const nodemailer = require('nodemailer');
-const util = require('util');
-// import mjml2html from 'mjml'
-// import { mjml2html } from 'mjml'
-// const mjml2html = require('mjml')
-// const mjml = require('mjml2html')
-const mjml2html = require('mjml');
-
-// import mjml2html from 'mjml'
 const app = express()
 dotenv.config()
+
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -23,15 +16,28 @@ const transporter = nodemailer.createTransport({
   },
 })
 
-const md_recipients = 'youremailhere@gmail.com'
-console.log("one");
+function sleep(milliseconds) { 
+  let timeStart = new Date().getTime(); 
+  while (true) { 
+      let elapsedTime = new Date().getTime() - timeStart; 
+      if (elapsedTime > milliseconds) { 
+          break; 
+      } 
+  } 
+} 
+
+const state_recipients = 'putyouremailhere@gmail.com'
+const state_bcc = 'putbccemailshere@gmail.com'
+
+console.log("Starting");
 setInterval(function() {
   //  I will run for every 15 minutes
-  console.log('two');
-  var sendorNah =  false;
+  console.log('Searching');
+  var vaccineavail =  false;
   var locs = [];
-
-  fetch("https://www.cvs.com/immunizations/covid-19-vaccine.vaccine-status.MD.json?vaccineinfo", {
+  var obj;
+// Replace the state in the fetch
+  fetch("https://www.cvs.com/immunizations/covid-19-vaccine.vaccine-status.NY.json?vaccineinfo", {
   method: "get",
   headers: { 
       "Content-Type": "application/json",
@@ -43,104 +49,68 @@ setInterval(function() {
     },
 })
   .then((res) => res.json())
+  .then(data => obj = data)
   .then((response) => {
-    console.log(response)
     // console.log(response.responsePayloadData.data)
     // console.log(response.responsePayloadData.data.MD[0])
-    response.responsePayloadData.data.MD.forEach(avCheck => {
+    // Check if vaccine is available at any locations
+    response.responsePayloadData.data.NY.forEach(avCheck => {
       if(avCheck.status == "Available"){
-        sendorNah = true;
+        vaccineavail = true;
         locs.push(avCheck);
+        // You can push/check for attributes
+        // cities.push(avCheck.city) 
+        // console.log(test)   
         console.log("> Found Available Location")
       }
     });
   }
   ).then(() => {
-      if(sendorNah){
-        var options = {}
-        const htmlOutput = mjml2html(`
-        <mjml>
-        <mj-body>
-          <mj-section>
-            <mj-column>
-      
-              <mj-image width="100px" src="/assets/img/logo-small.png"></mj-image>
-      
-              <mj-divider border-color="#F45E43"></mj-divider>
-      
-              <mj-text font-size="20px" color="#F45E43" font-family="helvetica">Vaccine Updates</mj-text>
-              
-              <mj-text>
-                yah boi
-				      </mj-text>
-
-              <mj-text font-size="15px">City New: </mj-text>
-            
-              <mj-text font-size="15px">Location:</mj-text>
-              
-              <mj-text font-size="15px">State:</mj-text>
-              
-            </mj-column>
-          </mj-section>
-        </mj-body>
-      </mjml>
-      `, options)
-
-
-      /*
-        Print the responsive HTML generated and MJML errors if any
-      */
-      console.log(htmlOutput.html)
-
-              //   var insidest = `
-              //   <table>
-              //   <tr>  
-              //     <th>Status</th>
-              //     <th>City</th>
-              //     <th>State</th>
-              //   </tr>
-              //   `
-              //   locs.forEach(anonymouse => {
-              //     //var coolStuff = "\n" + anonymouse.city + " " + anonymouse.state + " " + anonymouse.status
-              //   insidest += `
-              //   // <tr>
-              //   //   <td>` +anonymouse.status + `</td>
-              //   //   <td>` +anonymouse.city + `</td>
-              //   //   <td>` +anonymouse.state + `</td>
-              //   //   </tr>
-              //   // `
-              //   // console.log(anonymouse)
-              //  });
-              //  insidest += "</table>"
-              //  console.log('---=-=-=-=-=-=-=-----')
-              //  console.log(minify + insidest + minify2);
-          transporter.sendMail({
-
+      if(vaccineavail){
+                var htmltable = `
+                <table>
+                <tr>  
+                  <th>City</th>
+                  <th>State</th>
+                  <th>Status</th>
+                </tr>
+                `
+                locs.forEach(appointment => {
+                htmltable += `
+                <tr>
+                  <td style ="padding: 0 15px 0 0;">` +appointment.city + `</td>
+                  <td style ="padding: 0 15px 0 0;">` +appointment.state + `</td>
+                  <td style ="padding: 0 15px 0 0;">` +appointment.status + `</td>
+                  </tr>
+                `
+                console.log(appointment)
+               });
+               htmltable += "</table>"
+               console.log('---=-=-=-=-=-=-=-----')
+               console.log(htmltable);
+               test = (htmltable);
+            // Send Email                  
+            transporter.sendMail({
             from: process.env.FROM,
-            to: md_recipients,
-            subject: 'Maryland CVS Vaccine Availability Found',
-            text: JSON.stringify(locs),
-            // html: htmlOutput.html
-
+            to: state_recipients,
+            bcc: state_bcc,
+            subject: 'CVS Vaccine Availability Found',
+            html: test
           }, function (error, info) {
             if (error) {
-        throw error
+            throw error
             } else {
-              console.log('Maryland email successfully sent!')
+              console.log('Emails successfully sent!')
+              console.log('An Email was sent to ' + state_recipients + state_bcc)
+              console.log("Sleeping for 10 Minutes")
+              sleep(600000)
             }
           })
-      
+        console.log(" Found Vaccine Locations")
         console.log(locs);
       }
     }
   )
- },90000);
-
-//15 * 60 * 1000
-// const fetch = require('node-fetch');
-
-// fetch('https://google.com')
-//     .then(res => res.text())
-//     .then(text => console.log(text))
+ },90000); // set to time interval in milliseconds 
 
 app.listen(process.env.PORT)
